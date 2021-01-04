@@ -22,10 +22,6 @@ export class HomeService {
       .pipe(map((res: { banners: Banner[] }) => res.banners));
   }
 
-  /**
-   *
-   */
-
   getHotTags(): Observable<HotTag[]> {
     return this.http
       .get(`${this.baseUrl}/playlist/hot`)

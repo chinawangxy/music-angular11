@@ -52,6 +52,24 @@
           </div>
         </div>
       </div>
+
+      <div class="right">
+        <app-member-card></app-member-card>
+        <div class="settled-singer">
+          <div class="tit"><b>入驻歌手</b></div>
+          <div class="list">
+            <div class="card" *ngFor="let singer of singers">
+              <div class="pic">
+                <img [src]="singer.picUrl" [alt]="singer.name" />
+              </div>
+              <div class="txt">
+                <b class="ellipsis">{{ singer.name }}</b>
+                <span>专辑数: {{ singer.albumSize }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
