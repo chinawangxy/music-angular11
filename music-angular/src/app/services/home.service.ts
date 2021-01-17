@@ -23,14 +23,20 @@ export class HomeService {
   }
 
   getHotTags(): Observable<HotTag[]> {
-    return this.http
-      .get(`${this.baseUrl}/playlist/hot`)
-      .pipe(map((res: { tags: HotTag[] }) => res.tags));
+    return this.http.get(`${this.baseUrl}/playlist/hot`).pipe(
+      map((res: { tags: HotTag[] }) => res.tags),
+      map((tags) => {
+        return tags
+          .sort((x: HotTag, y: HotTag) => x.position - y.position)
+          .slice(0, 5);
+      })
+    );
   }
 
   getPersonalSheetList(): Observable<SongSheet[]> {
-    return this.http
-      .get(`${this.baseUrl}/personalized`)
-      .pipe(map((res: { result: SongSheet[] }) => res.result));
+    return this.http.get(`${this.baseUrl}/personalized`).pipe(
+      map((res: { result: SongSheet[] }) => res.result),
+      map((sheets) => sheets.splice(0, 16))
+    );
   }
 }

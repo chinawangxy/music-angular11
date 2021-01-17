@@ -1,9 +1,12 @@
+import { SheetService } from './../../services/sheet.service';
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { Banner, HotTag, Singer, SongSheet } from 'src/app/services/date-types';
 import { HomeService } from './../../services/home.service';
 import { NzCarouselComponent } from 'ng-zorro-antd';
-import { map } from 'rxjs/internal/operators';
+import { concatAll, map, take, tap } from 'rxjs/internal/operators';
 import { SingerService } from 'src/app/services/singer.service';
+import { ActivatedRoute } from '@angular/router';
+import { fromEvent, interval } from 'rxjs';
 
 @Component({
   selector: 'app-home',
@@ -22,19 +25,23 @@ export class HomeComponent implements OnInit {
   private nzCarousel: NzCarouselComponent;
 
   constructor(
-    private homeService: HomeService,
-    private singerService: SingerService
+    private sheetService: SheetService,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit() {
-    this.getBanners();
-    this.getHotTags();
-    this.getPersonalizedSheetList();
-    this.getEnterSingers();
+    this.route.data.subscribe(
+      ({ homeDatas: [banners, hotTags, songSheet, singers] }) => {
+        this.banners = banners;
+        this.hotTags = hotTags;
+        this.songSheetList = songSheet;
+        this.singers = singers;
+      }
+    );
   }
 
   onBeforeChange({ to }) {
-    console.log('[onBeforeChange =>]', to);
+    // console.log('[onBeforeChange =>]', to);
     this.carouselActiveIndex = to;
   }
 
@@ -42,42 +49,14 @@ export class HomeComponent implements OnInit {
     this.nzCarousel[type]();
   }
 
-  private getBanners() {
-    this.homeService.getBanners().subscribe((banners) => {
-      console.log('[这是轮播图数据]', banners);
-      this.banners = banners;
-    });
-  }
-
-  private getHotTags() {
-    this.homeService
-      .getHotTags()
-      .pipe(
-        map((tags) => {
-          return tags
-            .sort((x: HotTag, y: HotTag) => x.position - y.position)
-            .slice(0, 5);
-        })
-      )
-      .subscribe((tags) => {
-        console.log('[这是热门数据]', tags);
-        this.hotTags = tags;
-      });
-  }
-  private getPersonalizedSheetList() {
-    this.homeService
-      .getPersonalSheetList()
-      .pipe(map((sheets) => sheets.splice(0, 12)))
-      .subscribe((sheets) => {
-        console.log('[这是个人歌单数据]', sheets);
-        this.songSheetList = sheets;
-      });
-  }
-
-  private getEnterSingers() {
-    this.singerService.getEnterSinger().subscribe((singers) => {
-      console.log('[入住歌手数据]', singers);
-      this.singers = singers;
+  /**
+   * 播放歌单
+   * @param id 歌单Id
+   */
+  onPlaySheet(id: number) {
+    // console.log('[歌单的id]', id);
+    this.sheetService.playSheet(id).subscribe((res) => {
+      console.log('[歌单数据：]', res);
     });
   }
 }
