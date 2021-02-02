@@ -1,14 +1,16 @@
 import { DOCUMENT } from '@angular/common';
 import {
+  ChangeDetectorRef,
   Component,
   ElementRef,
   Inject,
   Input,
+  OnDestroy,
   OnInit,
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { fromEvent, merge, Observable } from 'rxjs';
+import { fromEvent, merge, Observable, Subscription } from 'rxjs';
 import {
   distinctUntilChanged,
   filter,
@@ -19,11 +21,12 @@ import {
 } from 'rxjs/internal/operators';
 import {
   getElementOffset,
+  getPercent,
   inArray,
   limitNumberInRange,
   sliderEvent,
 } from './wy-slider-helper';
-import { SliderEventObserverConfig } from './wy-slider-types';
+import { SliderEventObserverConfig, SliderValue } from './wy-slider-types';
 
 @Component({
   selector: 'app-wy-slider',
@@ -31,7 +34,7 @@ import { SliderEventObserverConfig } from './wy-slider-types';
   styleUrls: ['./wy-slider.component.less'],
   encapsulation: ViewEncapsulation.None,
 })
-export class WySliderComponent implements OnInit {
+export class WySliderComponent implements OnInit, OnDestroy {
   @Input() wyVertical = false;
   @Input() wyMin = 0;
   @Input() wyMax = 100;
@@ -39,13 +42,23 @@ export class WySliderComponent implements OnInit {
 
   private sliderDom: HTMLDivElement;
 
+  private isDragging: boolean = false;
+
+  value: SliderValue = null;
+  offset: SliderValue = null;
+  // ! 绑定订阅流
   private dragStart$: Observable<number>;
   private dragMove$: Observable<number>;
   private dragEnd$: Observable<Event>;
+  // ! 取消订阅流
+  private dragStart$_: Subscription | null;
+  private dragMove$_: Subscription | null;
+  private dragEnd$_: Subscription | null;
 
   constructor(
     private el: ElementRef,
-    @Inject(DOCUMENT) private doc: Document
+    @Inject(DOCUMENT) private doc: Document,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -105,25 +118,94 @@ export class WySliderComponent implements OnInit {
   /**
    * @summary 订阅事件
    */
-  private subscribeDrag(events: string[]) {
-    if (inArray(events, 'start') && this.dragStart$) {
+  private subscribeDrag(events: string[] = ['move', 'start', 'end']) {
+    if (inArray(events, 'start') && this.dragStart$ && !this.dragStart$_) {
       this.dragStart$.subscribe(this.onDragStart.bind(this));
     }
-    if (inArray(events, 'move') && this.dragMove$) {
-      this.dragStart$.subscribe(this.onDragMove.bind(this));
+    if (inArray(events, 'move') && this.dragMove$ && !this.dragMove$_) {
+      this.dragMove$.subscribe(this.onDragMove.bind(this));
     }
-    if (inArray(events, 'end') && this.dragEnd$) {
-      this.dragStart$.subscribe(this.onDragEnd.bind(this));
+    if (inArray(events, 'end') && this.dragEnd$ && this.dragEnd$_) {
+      this.dragEnd$.subscribe(this.onDragEnd.bind(this));
+    }
+  }
+
+  /**
+   * @summary 解除订阅事件
+   */
+  private unSubscribeDrag(events: string[] = ['move', 'start', 'end']) {
+    if (inArray(events, 'start') && this.dragStart$_) {
+      this.dragStart$_.unsubscribe();
+      this.dragStart$_ = null;
+    }
+    if (inArray(events, 'move') && this.dragMove$_) {
+      this.dragMove$_.unsubscribe();
+      this.dragMove$_ = null;
+    }
+    if (inArray(events, 'end') && this.dragEnd$_) {
+      this.dragEnd$_.unsubscribe();
+      this.dragEnd$_ = null;
     }
   }
 
   private onDragStart(value: number) {
-    console.log(value);
+    // * 正在移动 时传入参数 true
+    this.toggleDragMove(true);
+    // * 设定值
+    this.setValue(value);
   }
 
-  private onDragMove(value: number) {}
+  private onDragMove(value: number) {
+    if (this.isDragging) {
+      // * 设定值
+      this.setValue(value);
+      // ! 手动触发变更检查
+      this.cdr.markForCheck();
+    }
+  }
 
-  private onDragEnd() {}
+  private onDragEnd() {
+    // ! 不移动时 传入参数 false
+    this.toggleDragMove(false);
+    // ! 手动触发变更检查
+    this.cdr.markForCheck();
+  }
+
+  private toggleDragMove(movable: boolean) {
+    this.isDragging = movable;
+    if (movable) {
+      this.subscribeDrag(['move', 'end']);
+    } else {
+      // this.unSubscribeDrag()
+    }
+  }
+
+  // * 设定值
+  private setValue(value: SliderValue) {
+    // * 优化
+    if (this.valueEqual(this.value, value)) {
+      this.value = value;
+      // * 更新DOM
+      this.updateTrackAndHandles();
+    }
+  }
+
+  private valueEqual(valA: SliderValue, valB: SliderValue): boolean {
+    if (typeof valA !== typeof valB) {
+      return false;
+    }
+    return valA === valB;
+  }
+
+  private updateTrackAndHandles() {
+    this.offset = this.getValueToOffset(this.value);
+    // ! 手动触发变更检查
+    this.cdr.markForCheck();
+  }
+
+  private getValueToOffset(value: SliderValue): SliderValue {
+    return getPercent(value, this.wyMin, this.wyMax);
+  }
 
   /**
    * 工具 转换位置数据
@@ -154,5 +236,9 @@ export class WySliderComponent implements OnInit {
   private getSliderStartPosition(): number {
     const offset = getElementOffset(this.sliderDom);
     return this.wyVertical ? offset.top : offset.left;
+  }
+
+  ngOnDestroy(): void {
+    this.unSubscribeDrag();
   }
 }
