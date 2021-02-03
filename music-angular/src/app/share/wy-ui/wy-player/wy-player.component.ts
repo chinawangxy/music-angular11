@@ -7,7 +7,10 @@ import { Component, OnInit } from '@angular/core';
   styleUrls: ['./wy-player.component.less'],
 })
 export class WyPlayerComponent implements OnInit {
+  // * 进度条
   sliderValue: SliderValue = 35;
+  // * 缓冲条
+  bufferOffest: SliderValue = 70;
   constructor() {}
 
   ngOnInit() {}

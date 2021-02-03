@@ -48,6 +48,8 @@ export class WySliderComponent
   @Input() wyVertical = false;
   @Input() wyMin = 0;
   @Input() wyMax = 100;
+  @Input() bufferOffest: SliderValue = 0;
+
   @ViewChild('wySlider', { static: true }) private wySlider: ElementRef;
 
   private sliderDom: HTMLDivElement;
@@ -292,6 +294,6 @@ export class WySliderComponent
   }
 
   ngOnDestroy(): void {
-    this.unSubscribeDrag();
+    this.unsubscribeDrag();
   }
 }

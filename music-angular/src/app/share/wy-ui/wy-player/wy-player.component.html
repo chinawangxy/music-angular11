@@ -28,9 +28,9 @@
         </div>
         <div class="bar">
           <div class="slider-wrap">
-            <app-wy-slider [(ngModel)]="sliderValue"></app-wy-slider>
+            <app-wy-slider [bufferOffest]="bufferOffest" [(ngModel)]="sliderValue"></app-wy-slider>
           </div>
-          <span class="time"> <em>02:11</em>/ 04:35 </span>{{sliderValue}}
+          <span class="time"> <em>02:11</em>/ 04:35 </span>
         </div>
       </div>
       <!-- 右侧小图标 -->
@@ -44,6 +44,9 @@
         <p class="open">
           <span></span>
         </p>
+        <div class="control-vol">
+          <app-wy-slider [wyVertical]=true [(ngModel)]="sliderValue"></app-wy-slider>
+        </div>
       </div>
     </div>
   </div>
