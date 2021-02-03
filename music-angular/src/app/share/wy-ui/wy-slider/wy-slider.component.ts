@@ -3,6 +3,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  forwardRef,
   Inject,
   Input,
   OnDestroy,
@@ -10,6 +11,7 @@ import {
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { fromEvent, merge, Observable, Subscription } from 'rxjs';
 import {
   distinctUntilChanged,
@@ -33,8 +35,16 @@ import { SliderEventObserverConfig, SliderValue } from './wy-slider-types';
   templateUrl: './wy-slider.component.html',
   styleUrls: ['./wy-slider.component.less'],
   encapsulation: ViewEncapsulation.None,
+  providers: [
+    {
+      provide: NG_VALUE_ACCESSOR,
+      useExisting: forwardRef(() => WySliderComponent),
+      multi: true,
+    },
+  ],
 })
-export class WySliderComponent implements OnInit, OnDestroy {
+export class WySliderComponent
+  implements OnInit, OnDestroy, ControlValueAccessor {
   @Input() wyVertical = false;
   @Input() wyMin = 0;
   @Input() wyMax = 100;
@@ -73,7 +83,7 @@ export class WySliderComponent implements OnInit, OnDestroy {
     const mouse: SliderEventObserverConfig = {
       start: 'mousedown',
       move: 'mousemove',
-      end: 'mouseend',
+      end: 'mouseup',
       filter: (e) => e instanceof MouseEvent,
       pluckKey: [orientField],
     };
@@ -118,22 +128,22 @@ export class WySliderComponent implements OnInit, OnDestroy {
   /**
    * @summary 订阅事件
    */
-  private subscribeDrag(events: string[] = ['move', 'start', 'end']) {
+  private subscribeDrag(events: string[] = ['start', 'move', 'end']) {
     if (inArray(events, 'start') && this.dragStart$ && !this.dragStart$_) {
-      this.dragStart$.subscribe(this.onDragStart.bind(this));
+      this.dragStart$_ = this.dragStart$.subscribe(this.onDragStart.bind(this));
     }
     if (inArray(events, 'move') && this.dragMove$ && !this.dragMove$_) {
-      this.dragMove$.subscribe(this.onDragMove.bind(this));
+      this.dragMove$_ = this.dragMove$.subscribe(this.onDragMove.bind(this));
     }
-    if (inArray(events, 'end') && this.dragEnd$ && this.dragEnd$_) {
-      this.dragEnd$.subscribe(this.onDragEnd.bind(this));
+    if (inArray(events, 'end') && this.dragEnd$ && !this.dragEnd$_) {
+      this.dragEnd$_ = this.dragEnd$.subscribe(this.onDragEnd.bind(this));
     }
   }
 
   /**
    * @summary 解除订阅事件
    */
-  private unSubscribeDrag(events: string[] = ['move', 'start', 'end']) {
+  private unsubscribeDrag(events: string[] = ['start', 'move', 'end']) {
     if (inArray(events, 'start') && this.dragStart$_) {
       this.dragStart$_.unsubscribe();
       this.dragStart$_ = null;
@@ -142,15 +152,15 @@ export class WySliderComponent implements OnInit, OnDestroy {
       this.dragMove$_.unsubscribe();
       this.dragMove$_ = null;
     }
+
     if (inArray(events, 'end') && this.dragEnd$_) {
       this.dragEnd$_.unsubscribe();
       this.dragEnd$_ = null;
     }
   }
-
   private onDragStart(value: number) {
     // * 正在移动 时传入参数 true
-    this.toggleDragMove(true);
+    this.toggleDragMoving(true);
     // * 设定值
     this.setValue(value);
   }
@@ -166,28 +176,54 @@ export class WySliderComponent implements OnInit, OnDestroy {
 
   private onDragEnd() {
     // ! 不移动时 传入参数 false
-    this.toggleDragMove(false);
+    this.toggleDragMoving(false);
     // ! 手动触发变更检查
     this.cdr.markForCheck();
   }
 
-  private toggleDragMove(movable: boolean) {
+  private toggleDragMoving(movable: boolean) {
     this.isDragging = movable;
     if (movable) {
       this.subscribeDrag(['move', 'end']);
     } else {
-      // this.unSubscribeDrag()
+      this.unsubscribeDrag(['move', 'end']);
     }
   }
 
   // * 设定值
-  private setValue(value: SliderValue) {
-    // * 优化
-    if (this.valueEqual(this.value, value)) {
+  private setValue(value: SliderValue, needCheck = false): void {
+    console.log('setValue', value, needCheck);
+    if (needCheck) {
+      if (this.isDragging) {
+        return;
+      }
+      this.value = this.formatValue(value);
+      console.log('需要check：', value, this.value);
+      // * 更新DOM
+      this.updateTrackAndHandles();
+    } else if (!this.valueEqual(this.value, value)) {
       this.value = value;
       // * 更新DOM
       this.updateTrackAndHandles();
+
+      // * 响应值改变
+      this.onValueChange(this.value);
     }
+  }
+
+  private formatValue(value: SliderValue): SliderValue {
+    let res = value;
+    if (this.assertValueValid(value)) {
+      res = this.wyMin;
+    } else {
+      res = limitNumberInRange(value, this.wyMin, this.wyMax);
+    }
+    return res;
+  }
+
+  // * 判断是否是NAN
+  private assertValueValid(value: SliderValue): boolean {
+    return isNaN(typeof value !== 'number' ? parseFloat(value) : value);
   }
 
   private valueEqual(valA: SliderValue, valB: SliderValue): boolean {
@@ -198,7 +234,9 @@ export class WySliderComponent implements OnInit, OnDestroy {
   }
 
   private updateTrackAndHandles() {
+    console.log('offset-value:', this.value);
     this.offset = this.getValueToOffset(this.value);
+    console.log('offset:', this.offset);
     // ! 手动触发变更检查
     this.cdr.markForCheck();
   }
@@ -236,6 +274,21 @@ export class WySliderComponent implements OnInit, OnDestroy {
   private getSliderStartPosition(): number {
     const offset = getElementOffset(this.sliderDom);
     return this.wyVertical ? offset.top : offset.left;
+  }
+
+  private onValueChange(val: SliderValue): void {}
+  private onTouched(): void {}
+  // ! 赋值方法
+  writeValue(value: SliderValue): void {
+    this.setValue(value, true);
+  }
+  // ! 发射值
+  registerOnChange(fn: (value: SliderValue) => void): void {
+    this.onValueChange = fn;
+  }
+  // ! 发射值
+  registerOnTouched(fn: () => void): void {
+    this.onTouched = fn;
   }
 
   ngOnDestroy(): void {
