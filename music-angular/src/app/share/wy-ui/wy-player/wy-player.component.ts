@@ -1,14 +1,23 @@
+import { DOCUMENT } from '@angular/common';
 import {
   getCurrentIndex,
   getPlayMode,
   getCurrentSong,
 } from './../../../store/selectors/playSelector';
 import { SliderValue } from './../wy-slider/wy-slider-types';
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Inject,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { AppStoreModule } from 'src/app/store';
 import { select, Store } from '@ngrx/store';
 import { getPlayList, getSongList } from 'src/app/store/selectors/playSelector';
 import { Song } from 'src/app/services/date-types';
+import { SetCurrentIndex } from 'src/app/store/actions/player.actions';
+import { fromEvent, Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-wy-player',
@@ -17,9 +26,9 @@ import { Song } from 'src/app/services/date-types';
 })
 export class WyPlayerComponent implements OnInit {
   // * 进度条
-  sliderValue: SliderValue = 35;
+  percent: SliderValue = 0;
   // * 缓冲条
-  bufferOffest: SliderValue = 70;
+  bufferPercent: SliderValue = 0;
 
   songList: Song[];
 
@@ -35,10 +44,29 @@ export class WyPlayerComponent implements OnInit {
 
   currentTime: number;
 
+  // 播放状态
+  playing = false;
+
+  // 是否可以播放
+  songReady = false;
+
+  // 音量
+  volumn = 60;
+
+  // 传入状态控制 - 当前点击部分是否是音量面板本身
+  selfClick = false;
+  private winClick: Subscription;
+
+  // 是否展开音量面板
+  showVolumnPanel = false;
+
   @ViewChild('audioEL', { static: true }) private audio: ElementRef;
   private audioEl: HTMLAudioElement;
 
-  constructor(private store$: Store<AppStoreModule>) {
+  constructor(
+    private store$: Store<AppStoreModule>,
+    @Inject(DOCUMENT) private doc: Document
+  ) {
     const appStore$ = this.store$.pipe(select('player'));
 
     const stateArr = [
@@ -104,17 +132,130 @@ export class WyPlayerComponent implements OnInit {
   }
 
   public onCanPlay() {
+    this.songReady = true;
     this.play();
   }
 
   private play() {
     // console.log('play');
     this.audioEl.play();
+    this.playing = true;
+  }
+
+  // 播放 、 暂停
+  onToggle() {
+    if (!this.currentSong) {
+      if (this.playList.length) {
+        this.updateIndex(0);
+      }
+      return;
+    }
+    if (this.songReady) {
+      this.playing = !this.playing;
+      if (this.playing) {
+        this.audioEl.play();
+      } else {
+        this.audioEl.pause();
+      }
+    }
+  }
+
+  private updateIndex(index: number) {
+    this.store$.dispatch(SetCurrentIndex({ currentIndex: index }));
+    this.songReady = false;
+  }
+
+  // 上一曲
+  onPrev(index: number) {
+    if (!this.songReady) {
+      return;
+    }
+    if (this.playList.length === 1) {
+      this.loop();
+      return;
+    }
+    // 小于0时 播放最后一曲
+    const newIndex = index < 0 ? this.playList.length - 1 : index;
+    this.updateIndex(newIndex);
+  }
+
+  // 下一曲
+  onNext(index: number) {
+    if (!this.songReady) {
+      return;
+    }
+    if (this.playList.length === 1) {
+      this.loop();
+      return;
+    }
+    const newIndex = index >= this.playList.length ? 0 : index;
+    this.updateIndex(newIndex);
+  }
+
+  private loop() {
+    this.audioEl.currentTime = 0;
+    this.play();
   }
 
   onTimeUpdate(e: Event) {
     // console.log((e.target as HTMLAudioElement).currentTime);
     // console.log((<HTMLAudioElement>e.target).currentTime);
     this.currentTime = (<HTMLAudioElement>e.target).currentTime;
+    // 播放进度
+    this.percent = (this.currentTime / this.duration) * 100;
+
+    // 缓冲条
+    const buffered = this.audioEl.buffered;
+    if (buffered.length && this.bufferPercent < 100) {
+      this.bufferPercent = (buffered.end(0) / this.duration) * 100;
+    }
+  }
+  // 控制播放进度
+  onPrercentChange(per: number) {
+    // console.log('per', per);
+    if (this.currentSong) {
+      this.audioEl.currentTime = this.duration * (per / 100);
+    }
+  }
+
+  // 控制音量
+  onVolumnChange(per: number) {
+    this.audioEl.volume = per / 100;
+  }
+
+  // 控制音量面板
+  toggleVolPanel(evt: MouseEvent) {
+    // evt.stopPropagation();
+    this.togglePanel();
+  }
+
+  togglePanel() {
+    console.log('切换 音量');
+    this.showVolumnPanel = !this.showVolumnPanel;
+
+    if (this.showVolumnPanel) {
+      this.bindDocumentClickListener();
+    } else {
+      this.unBindDocumentClickListener();
+    }
+  }
+
+  private bindDocumentClickListener() {
+    if (!this.winClick) {
+      this.winClick = fromEvent(this.doc, 'click').subscribe(() => {
+        if (!this.selfClick) {
+          // 点击了播放器以外部分
+          this.showVolumnPanel = false;
+          this.unBindDocumentClickListener();
+        }
+        this.selfClick = false;
+      });
+    }
+  }
+  private unBindDocumentClickListener() {
+    if (this.winClick) {
+      this.winClick.unsubscribe();
+      this.winClick = null;
+    }
   }
 }

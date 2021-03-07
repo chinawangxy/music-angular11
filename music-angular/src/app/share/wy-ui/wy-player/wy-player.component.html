@@ -1,4 +1,4 @@
-<div class="m-player">
+<div class="m-player" (click)="selfClick = true">
   <div class="lock">
     <div class="left"><i></i></div>
   </div>
@@ -8,9 +8,9 @@
     <div class="wrap">
       <!-- 按钮组 -->
       <div class="btns">
-        <i class="prev"></i>
-        <i class="toggle"></i>
-        <i class="next"></i>
+        <i class="prev" (click)="onPrev(currentIndex -1)"></i>
+        <i class="toggle" [class.playing]="playing" (click)="onToggle()"></i>
+        <i class="next" (click)="onNext(currentIndex +1)"></i>
       </div>
       <div class="head">
         <img [src]="picUrl" alt="" />
@@ -28,7 +28,7 @@
         </div>
         <div class="bar">
           <div class="slider-wrap">
-            <app-wy-slider [bufferOffest]="bufferOffest" [(ngModel)]="sliderValue"></app-wy-slider>
+            <app-wy-slider [bufferOffest]="bufferPercent" [(ngModel)]="percent" (wyOnAfterChange)="onPrercentChange($event)"></app-wy-slider>
           </div>
           <span class="time"> <em>{{currentTime | formatTime}}</em>/ {{duration | formatTime}} </span>
         </div>
@@ -39,13 +39,13 @@
         <i class="share" title="分享"></i>
       </div>
       <div class="ctrl">
-        <i class="volume" title="音量"></i>
+        <i class="volume" title="音量" (click)="togglePanel()"></i>
         <i class="loop" title="循环"></i>
         <p class="open">
           <span></span>
         </p>
-        <div class="control-vol">
-          <app-wy-slider [wyVertical]=true [(ngModel)]="sliderValue"></app-wy-slider>
+        <div class="control-vol" [hidden]="!showVolumnPanel">
+          <app-wy-slider [wyVertical]=true [(ngModel)]="volumn" (ngModelChange)="onVolumnChange($event)"></app-wy-slider>
         </div>
       </div>
     </div>

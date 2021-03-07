@@ -3,11 +3,13 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  EventEmitter,
   forwardRef,
   Inject,
   Input,
   OnDestroy,
   OnInit,
+  Output,
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
@@ -52,6 +54,8 @@ export class WySliderComponent
 
   @ViewChild('wySlider', { static: true }) private wySlider: ElementRef;
 
+  @Output() wyOnAfterChange = new EventEmitter<SliderValue>();
+
   private sliderDom: HTMLDivElement;
 
   private isDragging: boolean = false;
@@ -74,7 +78,7 @@ export class WySliderComponent
   ) {}
 
   ngOnInit() {
-    console.log('el:', this.wySlider.nativeElement);
+    // console.log('el:', this.wySlider.nativeElement);
     this.sliderDom = this.wySlider.nativeElement;
     this.createDraggingObservables();
     this.subscribeDrag(['start']);
@@ -177,6 +181,9 @@ export class WySliderComponent
   }
 
   private onDragEnd() {
+    // 对外发出事件
+    this.wyOnAfterChange.emit(this.value);
+
     // ! 不移动时 传入参数 false
     this.toggleDragMoving(false);
     // ! 手动触发变更检查
@@ -194,13 +201,13 @@ export class WySliderComponent
 
   // * 设定值
   private setValue(value: SliderValue, needCheck = false): void {
-    console.log('setValue', value, needCheck);
+    // console.log('setValue', value, needCheck);
     if (needCheck) {
       if (this.isDragging) {
         return;
       }
       this.value = this.formatValue(value);
-      console.log('需要check：', value, this.value);
+      // console.log('需要check：', value, this.value);
       // * 更新DOM
       this.updateTrackAndHandles();
     } else if (!this.valueEqual(this.value, value)) {
@@ -236,9 +243,9 @@ export class WySliderComponent
   }
 
   private updateTrackAndHandles() {
-    console.log('offset-value:', this.value);
+    // console.log('offset-value:', this.value);
     this.offset = this.getValueToOffset(this.value);
-    console.log('offset:', this.offset);
+    // console.log('offset:', this.offset);
     // ! 手动触发变更检查
     this.cdr.markForCheck();
   }
