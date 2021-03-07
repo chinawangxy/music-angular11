@@ -152,6 +152,8 @@ export class WyPlayerComponent implements OnInit {
     }
     if (this.songReady) {
       this.playing = !this.playing;
+
+      // 根据 播放状态 操作DOM
       if (this.playing) {
         this.audioEl.play();
       } else {
@@ -160,6 +162,7 @@ export class WyPlayerComponent implements OnInit {
     }
   }
 
+  // 设置歌曲播放
   private updateIndex(index: number) {
     this.store$.dispatch(SetCurrentIndex({ currentIndex: index }));
     this.songReady = false;
@@ -192,11 +195,12 @@ export class WyPlayerComponent implements OnInit {
     this.updateIndex(newIndex);
   }
 
+  // 循环播放
   private loop() {
     this.audioEl.currentTime = 0;
     this.play();
   }
-
+  // 播放时间变更时 更新 缓冲条 与 播放进度
   onTimeUpdate(e: Event) {
     // console.log((e.target as HTMLAudioElement).currentTime);
     // console.log((<HTMLAudioElement>e.target).currentTime);
@@ -228,7 +232,7 @@ export class WyPlayerComponent implements OnInit {
     // evt.stopPropagation();
     this.togglePanel();
   }
-
+  // 切换音量面板
   togglePanel() {
     console.log('切换 音量');
     this.showVolumnPanel = !this.showVolumnPanel;
