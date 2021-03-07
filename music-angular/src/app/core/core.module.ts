@@ -1,3 +1,4 @@
+import { AppStoreModule } from './../store/index';
 import { NgModule, Optional, SkipSelf } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
@@ -18,6 +19,7 @@ import { PagesModule } from './../pages/pages.module';
     BrowserAnimationsModule,
     AppRoutingModule,
     ShareModule,
+    AppStoreModule,
     PagesModule,
   ],
   exports: [ShareModule, AppRoutingModule],

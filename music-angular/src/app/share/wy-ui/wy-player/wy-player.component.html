@@ -13,16 +13,16 @@
         <i class="next"></i>
       </div>
       <div class="head">
-        <img src="" alt="" />
+        <img [src]="picUrl" alt="" />
         <i class="mask"></i>
       </div>
       <div class="play">
-        <div class="words clearfix hide">
-          <p class="ellipsis margin-bottom-none">歌名</p>
+        <div class="words clearfix">
+          <p class="ellipsis margin-bottom-none">{{currentSong?.name}}</p>
           <ul class="songs clearfix margin-bottom-none">
-            <li>歌手1/</li>
-            <li>
-              <a>歌手2</a>
+            <li *ngFor="let item of currentSong?.ar; last as isLast">
+              <a>{{item.name}}</a>
+              <span [hidden]="isLast">/</span>
             </li>
           </ul>
         </div>
@@ -30,7 +30,7 @@
           <div class="slider-wrap">
             <app-wy-slider [bufferOffest]="bufferOffest" [(ngModel)]="sliderValue"></app-wy-slider>
           </div>
-          <span class="time"> <em>02:11</em>/ 04:35 </span>
+          <span class="time"> <em>{{currentTime | formatTime}}</em>/ {{duration | formatTime}} </span>
         </div>
       </div>
       <!-- 右侧小图标 -->
@@ -50,4 +50,9 @@
       </div>
     </div>
   </div>
+
+  <audio #audioEL [src]="currentSong?.url"
+  (canplay)="onCanPlay()"
+  (timeupdate)="onTimeUpdate($event)"
+  ></audio>
 </div>

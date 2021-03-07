@@ -1,13 +1,15 @@
+import {
+  SetCurrentIndex,
+  SetPlayList,
+  SetSongList,
+} from './../../store/actions/player.actions';
 import { SheetService } from './../../services/sheet.service';
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { Banner, HotTag, Singer, SongSheet } from 'src/app/services/date-types';
-import { HomeService } from './../../services/home.service';
 import { NzCarouselComponent } from 'ng-zorro-antd';
-import { concatAll, map, take, tap } from 'rxjs/internal/operators';
-import { SingerService } from 'src/app/services/singer.service';
 import { ActivatedRoute } from '@angular/router';
-import { fromEvent, interval } from 'rxjs';
-
+import { AppStoreModule } from 'src/app/store';
+import { Store } from '@ngrx/store';
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
@@ -26,7 +28,8 @@ export class HomeComponent implements OnInit {
 
   constructor(
     private sheetService: SheetService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private store$: Store<AppStoreModule>
   ) {}
 
   ngOnInit() {
@@ -55,8 +58,12 @@ export class HomeComponent implements OnInit {
    */
   onPlaySheet(id: number) {
     // console.log('[歌单的id]', id);
-    this.sheetService.playSheet(id).subscribe((res) => {
-      console.log('[歌单数据：]', res);
+    this.sheetService.playSheet(id).subscribe((list) => {
+      console.log('[歌单数据：]', list);
+
+      this.store$.dispatch(SetSongList({ songList: list }));
+      this.store$.dispatch(SetPlayList({ playList: list }));
+      this.store$.dispatch(SetCurrentIndex({ currentIndex: 0 }));
     });
   }
 }
