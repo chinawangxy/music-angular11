@@ -1,8 +1,14 @@
+import {
+  SetPlayList,
+  SetPlayMode,
+} from './../../../store/actions/player.actions';
+import { PlayMode } from 'src/app/share/wy-ui/wy-player/player-type';
 import { DOCUMENT } from '@angular/common';
 import {
   getCurrentIndex,
   getPlayMode,
   getCurrentSong,
+  getPlayer,
 } from './../../../store/selectors/playSelector';
 import { SliderValue } from './../wy-slider/wy-slider-types';
 import {
@@ -18,6 +24,23 @@ import { getPlayList, getSongList } from 'src/app/store/selectors/playSelector';
 import { Song } from 'src/app/services/date-types';
 import { SetCurrentIndex } from 'src/app/store/actions/player.actions';
 import { fromEvent, Subscription } from 'rxjs';
+import { tap } from 'rxjs/internal/operators';
+import { findIndex, shuffle } from 'src/app/utils/array';
+
+const modeTypes: PlayMode[] = [
+  {
+    type: 'loop',
+    label: '循环',
+  },
+  {
+    type: 'random',
+    label: '随机',
+  },
+  {
+    type: 'singleLoop',
+    label: '单曲循环',
+  },
+];
 
 @Component({
   selector: 'app-wy-player',
@@ -53,6 +76,13 @@ export class WyPlayerComponent implements OnInit {
   // 音量
   volumn = 60;
 
+  currentMode: PlayMode;
+
+  modeCount = 0;
+
+  // 歌单面板
+  showPanel = false;
+
   // 传入状态控制 - 当前点击部分是否是音量面板本身
   selfClick = false;
   private winClick: Subscription;
@@ -67,34 +97,23 @@ export class WyPlayerComponent implements OnInit {
     private store$: Store<AppStoreModule>,
     @Inject(DOCUMENT) private doc: Document
   ) {
-    const appStore$ = this.store$.pipe(select('player'));
-
-    const stateArr = [
-      {
-        type: getSongList,
-        cb: (list) => this.watchList(list, 'songList'),
-      },
-      {
-        type: getPlayList,
-        cb: (list) => this.watchList(list, 'playList'),
-      },
-      {
-        type: getCurrentIndex,
-        cb: (list) => this.watchCurrentIndex(list),
-      },
-      {
-        type: getPlayMode,
-        cb: (mode) => this.watchPlayMode(mode),
-      },
-      {
-        type: getCurrentSong,
-        cb: (song) => this.watchCurrentSong(song),
-      },
-    ];
-
-    stateArr.forEach((item) => {
-      appStore$.pipe(select(item['type'])).subscribe(item.cb);
-    });
+    const appStore$ = this.store$.pipe(select(getPlayer));
+    appStore$
+      .pipe(select(getSongList))
+      .subscribe((list) => this.watchList(list, 'songList'));
+    appStore$
+      .pipe(select(getPlayList))
+      .subscribe((list) => this.watchList(list, 'playList'));
+    appStore$
+      .pipe(select(getCurrentIndex))
+      .subscribe((index) => this.watchCurrentIndex(index));
+    appStore$
+      .pipe(select(getPlayMode))
+      .subscribe((mode) => this.watchPlayMode(mode));
+    appStore$
+      .pipe(select(getCurrentSong))
+      .subscribe((song) => this.watchCurrentSong(song));
+    // appStore$.pipe(select(getCurrentAction)).subscribe(action => this.watchCurrentAction(action));
   }
 
   ngOnInit() {
@@ -102,18 +121,27 @@ export class WyPlayerComponent implements OnInit {
   }
 
   private watchList(list: Song[], type: string) {
-    console.log('list', list);
     this[type] = list;
   }
 
   private watchCurrentIndex(index: number) {
-    console.log('index', index);
+    // console.log('index:', index);
     this.currentIndex = index;
   }
 
-  private watchPlayMode(mode: number) {
-    console.log('mode', mode);
-    // this.currentIndex = Module;
+  private watchPlayMode(mode: PlayMode) {
+    // console.log('mode', mode);
+    this.currentMode = mode;
+    // 保存副本 避免引用问题
+    if (this.songList) {
+      let list = this.songList.slice();
+      if (mode.type === 'random') {
+        list = shuffle(this.songList);
+        // 随机模式下 才更换 当前歌曲索引
+        this.updateCurrentIndex(list, this.currentSong);
+        this.store$.dispatch(SetPlayList({ playList: list }));
+      }
+    }
   }
 
   private watchCurrentSong(song: Song) {
@@ -228,30 +256,49 @@ export class WyPlayerComponent implements OnInit {
   }
 
   // 控制音量面板
-  toggleVolPanel(evt: MouseEvent) {
-    // evt.stopPropagation();
-    this.togglePanel();
+  toggleVolPanel() {
+    this.togglePanel('showVolumnPanel');
   }
-  // 切换音量面板
-  togglePanel() {
-    console.log('切换 音量');
-    this.showVolumnPanel = !this.showVolumnPanel;
+  // 控制歌曲面板
+  toggleListPanel() {
+    if (this.songList.length) {
+      this.togglePanel('showPanel');
+    }
+  }
+  // 切换音量面板  + //!主动设置监听和接触监听
+  togglePanel(type: string) {
+    // console.log('切换 音量');
+    this[type] = !this[type];
 
-    if (this.showVolumnPanel) {
+    if (this.showVolumnPanel || this.showPanel) {
+      // 面板 开启 绑定监听
       this.bindDocumentClickListener();
     } else {
+      // 面板关闭 解除监听
       this.unBindDocumentClickListener();
     }
   }
 
+  // 改变当前播放歌曲
+  onChangeSong(song: Song) {
+    console.log('song', song);
+    // 随机模式下 才更换 当前歌曲索引
+    this.updateCurrentIndex(this.playList, song);
+  }
+
   private bindDocumentClickListener() {
+    // 监听事件 不存在 则设立监听事件
     if (!this.winClick) {
+      // !被动监听事件 关闭面板 取消监听
       this.winClick = fromEvent(this.doc, 'click').subscribe(() => {
+        // 非播放器 点击 则解绑
         if (!this.selfClick) {
           // 点击了播放器以外部分
-          this.showVolumnPanel = false;
-          this.unBindDocumentClickListener();
+          this.showVolumnPanel = false; // 关闭面板
+          this.showPanel = false; // 关闭面板
+          this.unBindDocumentClickListener(); // 解绑监听事件 初始化
         }
+        // 设置状态
         this.selfClick = false;
       });
     }
@@ -260,6 +307,33 @@ export class WyPlayerComponent implements OnInit {
     if (this.winClick) {
       this.winClick.unsubscribe();
       this.winClick = null;
+    }
+  }
+
+  // 改变模式
+  changeMode() {
+    const temp = modeTypes[++this.modeCount % 3];
+    // console.log(temp);
+
+    // 变更mode
+    this.store$.dispatch(
+      SetPlayMode({ playMode: modeTypes[++this.modeCount % 3] })
+    );
+  }
+
+  private updateCurrentIndex(list: Song[], song: Song) {
+    // const newIndex = list.findIndex((item) => item.id === song.id);
+    const newIndex = findIndex(list, song);
+    this.store$.dispatch(SetCurrentIndex({ currentIndex: newIndex }));
+  }
+
+  // 播放结束
+  onEnded() {
+    this.playing = false;
+    if (this.currentMode.type === 'singleLoop') {
+      this.loop();
+    } else {
+      this.onNext(this.currentIndex + 1);
     }
   }
 }

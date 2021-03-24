@@ -1,7 +1,8 @@
 import { PlayState } from './../reducers/player.reducer';
-import { createSelector } from '@ngrx/store';
+import { createFeatureSelector, createSelector } from '@ngrx/store';
 
 const selectPlayerStates = (state: PlayState) => state;
+export const getPlayer = createFeatureSelector<PlayState>('player');
 
 export const getPlaying = createSelector(
   selectPlayerStates,

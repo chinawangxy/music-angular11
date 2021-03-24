@@ -40,19 +40,30 @@
       </div>
       <div class="ctrl">
         <i class="volume" title="音量" (click)="togglePanel()"></i>
-        <i class="loop" title="循环"></i>
-        <p class="open">
+        <i [ngClass]="currentMode.type" [title]="currentMode.label" (click)="changeMode()"></i>
+        <p class="open" (click)="toggleListPanel($event)">
           <span></span>
         </p>
         <div class="control-vol" [hidden]="!showVolumnPanel">
-          <app-wy-slider [wyVertical]=true [(ngModel)]="volumn" (ngModelChange)="onVolumnChange($event)"></app-wy-slider>
+          <app-wy-slider
+          [wyVertical]=true
+          [(ngModel)]="volumn"
+          (ngModelChange)="onVolumnChange($event)"></app-wy-slider>
         </div>
       </div>
+      <app-wy-player-panel
+       [songList]="songList"
+       [currentSong]="currentSong"
+       [show]="showPanel"
+       (onClose)="showPanel = false"
+       (onChangeSong)="onChangeSong($event)"
+       ></app-wy-player-panel>
     </div>
   </div>
 
   <audio #audioEL [src]="currentSong?.url"
   (canplay)="onCanPlay()"
   (timeupdate)="onTimeUpdate($event)"
+  (ended)="onEnded()"
   ></audio>
 </div>

@@ -1,3 +1,4 @@
+import { PlayState } from './../../store/reducers/player.reducer';
 import {
   SetCurrentIndex,
   SetPlayList,
@@ -9,7 +10,9 @@ import { Banner, HotTag, Singer, SongSheet } from 'src/app/services/date-types';
 import { NzCarouselComponent } from 'ng-zorro-antd';
 import { ActivatedRoute } from '@angular/router';
 import { AppStoreModule } from 'src/app/store';
-import { Store } from '@ngrx/store';
+import { select, Store } from '@ngrx/store';
+import { getPlayer } from 'src/app/store/selectors/playSelector';
+import { findIndex, shuffle } from 'src/app/utils/array';
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
@@ -22,6 +25,7 @@ export class HomeComponent implements OnInit {
   public singers: Singer[];
 
   public carouselActiveIndex = 0;
+  private playerState: PlayState;
 
   @ViewChild(NzCarouselComponent, { static: true })
   private nzCarousel: NzCarouselComponent;
@@ -30,7 +34,11 @@ export class HomeComponent implements OnInit {
     private sheetService: SheetService,
     private route: ActivatedRoute,
     private store$: Store<AppStoreModule>
-  ) {}
+  ) {
+    this.store$.pipe(select(getPlayer)).subscribe((res) => {
+      this.playerState = res;
+    });
+  }
 
   ngOnInit() {
     this.route.data.subscribe(
@@ -59,11 +67,24 @@ export class HomeComponent implements OnInit {
   onPlaySheet(id: number) {
     // console.log('[歌单的id]', id);
     this.sheetService.playSheet(id).subscribe((list) => {
-      console.log('[歌单数据：]', list);
+      // console.log('[歌单数据：]', list);
 
       this.store$.dispatch(SetSongList({ songList: list }));
-      this.store$.dispatch(SetPlayList({ playList: list }));
-      this.store$.dispatch(SetCurrentIndex({ currentIndex: 0 }));
+      console.log('list', list);
+      let tureIndex = 0;
+      let tureList = list.slice();
+      // !考虑模式随机 场景下首次播放
+      if (this.playerState.playMode.type === 'random') {
+        console.log('random');
+
+        tureList = shuffle(tureList || []);
+        tureIndex = findIndex(tureList, list[tureIndex]);
+
+        console.log('random', tureList, tureIndex);
+      }
+
+      this.store$.dispatch(SetPlayList({ playList: tureList }));
+      this.store$.dispatch(SetCurrentIndex({ currentIndex: tureIndex }));
     });
   }
 }
